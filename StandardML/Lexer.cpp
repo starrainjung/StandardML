@@ -6,11 +6,7 @@
 
 #include "Lexer.h"
 
-//static std::string IdentifierStr; // Filled in if tok_identifier
-//static char CharVal;
-//static std::string StrVal;
-//static double NumVal; // Filled in if tok_int or double
-//static int LastChar;
+
 
 //Ê¶±ð·ûºÅ
 bool Lexer::issymble(int LastChar) {
