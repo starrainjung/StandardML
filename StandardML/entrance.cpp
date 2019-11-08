@@ -13,9 +13,8 @@ int main() {
 	Lexer lexer;
 	while (true) {
 
-		printf("%d ",lexer.gettok());
-
+		fprintf(stdout, "%d ",lexer.gettok());
+		
 	}
-
 }
 
