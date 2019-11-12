@@ -88,6 +88,9 @@ StyleCopReport.xml
 *.pidb
 *.svclog
 *.scc
+*.vcxproj
+*.vcxproj.user
+*.vcxproj.filters
 StandardML/*.vcxproj
 StandardML/*.vcxproj.filters
 StandardML/*.vcxproj.user
