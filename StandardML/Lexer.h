@@ -24,5 +24,5 @@ private:
 	int readNum(bool isnegative, int* LastChar);
 	bool issymble(int LastChar);
 	int readStr(bool isStr, int* LastChar);
-	int readEscapeSequence(bool isStr, int* LastChar;
+	int readEscapeSequence(bool isStr, int* LastChar);
 };

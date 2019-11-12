@@ -13,7 +13,7 @@ int main() {
 	Lexer lexer;
 	while (true) {
 
-		fprintf(stdout, "%d ",lexer.gettok());
+		fprintf(stdout, "%d \n",lexer.gettok());
 		
 	}
 }

@@ -10,8 +10,6 @@ class Parser
 {
 public:
 	Lexer lexer;
-	
-	
 
 private:
 	int CurTok = 0;

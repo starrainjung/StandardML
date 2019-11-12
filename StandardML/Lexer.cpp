@@ -8,14 +8,13 @@
 
 //识别符号
 bool Lexer::issymble(int LastChar) {
-	bool ans = LastChar == '!' || LastChar == '%' || LastChar == '&' ||
+	return LastChar == '!' || LastChar == '%' || LastChar == '&' ||
 		LastChar == '$' || LastChar == '#' || LastChar == '+' ||
 		LastChar == '-' || LastChar == '*' || LastChar == '/' ||
 		LastChar == ':' || LastChar == '<' || LastChar == '=' ||
 		LastChar == '>' || LastChar == '?' || LastChar == '@' ||
 		LastChar == '\\' || LastChar == '~' || LastChar == '`' ||
 		LastChar == '^' || LastChar == '|' || LastChar == '.';
-	return ans;
 }
 
 //lex number when meet 'E'
@@ -41,15 +40,11 @@ int Lexer::readE(int* LastChar, string* NumStr) {
 			NumVal = strtod((*NumStr).c_str(), nullptr);
 			return tok_real;
 		}
-		else {
-			LexerError("illegal expression of negative '~'");
-			return tok_error;// 报错，E后只有~没有数字
-		}
+		else
+			return LexerError("illegal expression of negative '~'");// 报错，E后只有~没有数字
 	}
-	else {
-		LexerError("illegal expression of scientific notation 'E'");
-		return tok_error;// 报错，E后不为数
-	}
+	else		
+		return LexerError("illegal expression of scientific notation 'E'");// 报错，E后不为数
 }
 
 //lex number when meet '.'
@@ -60,10 +55,8 @@ int Lexer::readPoint(int* LastChar, string* NumStr) {
 		NumStr += *LastChar;
 		*LastChar = getchar();
 	}
-	if (*LastChar == '.') {
-		LexerError("illegal expression of decimal '.'");
-		return tok_error;// 报错，出现多余的小数点
-	}
+	if (*LastChar == '.')
+		return LexerError("illegal expression of decimal '.'");// 报错，出现多余的小数点
 	else if (*LastChar == 'E')
 		return readE(LastChar, NumStr);
 	else {
@@ -72,7 +65,7 @@ int Lexer::readPoint(int* LastChar, string* NumStr) {
 	}	
 }
 
-// lex number
+// lex number(int and real)
 int Lexer::readNum(bool isNegative,int* LastChar) {
 	string NumStr = "";
 	if (isNegative)
@@ -91,19 +84,16 @@ int Lexer::readNum(bool isNegative,int* LastChar) {
 	}
 }
 
-// lex escape sequence of character
+// lex escape sequence of character and string
+// NOTE: 转义序列包括: '\n' '\t' '\v' '\b' '\r' '\f' '\a' 
+//                    '\\' '\"' '\ 空格，制表符 换行 换页 \'
 int Lexer::readEscapeSequence(bool isStr, int* LastChar) {
 	*LastChar = getchar();
-	if (*LastChar == '\"')
+	if (*LastChar == '\"' || *LastChar == '\\')
 		if (isStr)
-			StrVal += '\"';
+			StrVal += *LastChar;
 		else
-			CharVal = '\"';
-	else if (*LastChar == '\\')
-		if (isStr)
-			StrVal += '\\';
-		else
-			CharVal = '\\';
+			CharVal = *LastChar;
 	else if(*LastChar == 'n')
 		if (isStr)
 			StrVal += '\n';
@@ -114,86 +104,100 @@ int Lexer::readEscapeSequence(bool isStr, int* LastChar) {
 			StrVal += '\t';
 		else
 			CharVal = '\t';
-	else if (*LastChar == '\n' || *LastChar == '\t' || *LastChar == ' ' || *LastChar == '\n') {
+	else if (*LastChar == 'v')
+		if (isStr)
+			StrVal += '\v';
+		else
+			CharVal = '\v';
+	else if (*LastChar == 'b')
+		if (isStr)
+			StrVal += '\b';
+		else
+			CharVal = '\b';
+	else if (*LastChar == 'r')
+		if (isStr)
+			StrVal += '\r';
+		else
+			CharVal = '\r';
+	else if (*LastChar == 'f')
+		if (isStr)
+			StrVal += '\f';
+		else
+			CharVal = '\f';
+	else if (*LastChar == 'a')
+		if (isStr)
+			StrVal += '\a';
+		else
+			CharVal = '\a';
+	else if (*LastChar == '\n' || *LastChar == '\t' || *LastChar == ' ' || *LastChar == '\f') {
 		*LastChar = getchar();
-		while (*LastChar != '\n' && *LastChar == '\t' && *LastChar == ' ' && *LastChar == '\n')
+		while (*LastChar == '\n' || *LastChar == '\t' || *LastChar == ' ' || *LastChar == '\f')
 			*LastChar = getchar();
-		if (*LastChar == '\\')
-			return 0;
-		else {
-			LexerError("illegal expression of character");
-			return tok_error;
-		}
+		if (*LastChar != '\\')			
+			return LexerError("illegal expression of character");
+		return 0;
 	}
-	else {
-		LexerError("illegal expression of character");
-	}
-		
+	else		
+		return LexerError("illegal expression of character");
+	return 1;
 }
 
 // lex string or char
-// NOTE: 转义序列包括 \n \t \\ \"
-// TODO: 字符串时的转义序列识别
-int Lexer::readStr(bool isStr,int* LastChar) {
+int Lexer::readStr(bool isStr, int* LastChar) {
 	*LastChar = getchar();
 	if (isStr) {
 		StrVal = "";
-		if (*LastChar == '\"') { //识别空字符串
-			return tok_string;
-		}
 		while (*LastChar != '\"') {
+			if (*LastChar == '\n' || *LastChar == '\t')
+				return LexerError("illegal non-printing character in string");
+			else if (*LastChar == '\\') {
+				if (readEscapeSequence(1, LastChar) == tok_error)
+					return tok_error;
+				*LastChar = getchar();
+			}
 			StrVal += *LastChar;
 			*LastChar = getchar();
-			if (*LastChar == '\"')
-				if (StrVal[StrVal.length() - 1] != '\\')// what if "\\" 
-					break;
-				else
-					continue;
-			if (*LastChar == '\n') { //error，字符串未闭合
-				LexerError("unclosed string");
-				return tok_error;
-			}
 		}
 		// 跳过 " 
 		*LastChar = getchar();
 		return tok_string;
 	}
-	else {	
-		if (*LastChar == '\"') { //报错，字符不能为空
-			LexerError("character cannot be empty");
-			return tok_error;
-		}
-		if (*LastChar == '\n') { //报错，字符未闭合
-			LexerError("unclosed character");
-			return tok_error;
-		}
-		if (*LastChar == '\\') {
+	else {
+		bool isSetChar = false;
+		if (*LastChar == '\"')		
+			return LexerError("character cannot be empty"); //报错，字·符不能为空
+		while (*LastChar == '\\') {
+			int i = readEscapeSequence(0, LastChar);
+			if (i == tok_error)
+				return tok_error;
+			else if (i == 1 && !isSetChar)
+				isSetChar = true;
+			else if (i == 1 && isSetChar)			
+				return LexerError("length of character not 1");
 			*LastChar = getchar();
-			if (*LastChar == '\\')
-				CharVal = '\\';
-			else if (*LastChar == 'n')
-				CharVal = '\n';
-			else if (*LastChar == 't')
-				CharVal = '\t';
-			else if (*LastChar == '\"')
-				CharVal = '\"';
-			else {
-				LexerError("length of character not 1");
-				return tok_error;//不合法的字符
+		}
+		if (!isSetChar) {
+			if (*LastChar == '\n' || *LastChar == '\t')				
+				return LexerError("illegal non-printing character");
+			CharVal = *LastChar;
+			*LastChar = getchar();
+		}
+		else
+			while (*LastChar != '\\') {
+				int i = readEscapeSequence(0, LastChar);
+				if (i == tok_error)
+					return tok_error;
+				else if (i == 1)				
+					return LexerError("length of character not 1");
+				*LastChar = getchar();
 			}
-		}
-		else {
-			CharVal = *LastChar;		
-		}
-		*LastChar = getchar();
 		if (*LastChar == '\"') {
 			*LastChar = getchar();
 			return tok_char;
 		}
-		else {
-			LexerError("length of character not 1");
-			return tok_error;//字符长度超过1 or 字符未闭合
-		}
+		else
+			
+			return LexerError("length of character not 1"); //字符长度超过1 or 字符未闭合
 	}
 }
 
@@ -390,10 +394,8 @@ int Lexer::gettok() {
 						return gettok();
 					else
 						continue;
-				else if (LastChar == '\n') {
-					LexerError("unclosed annotation");
-					return tok_error; //报错，注释未闭合
-				}
+				else if (LastChar == '\n')				
+					return LexerError("unclosed annotation"); //报错，注释未闭合
 			}
 	}
 

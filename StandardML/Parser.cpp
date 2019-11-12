@@ -7,7 +7,7 @@
 
 
 int Parser::getNextToken() {
-	return lexer.gettok();
+	return CurTok = lexer.gettok();
 }
 
 int Parser::GetTokPrecedence() {
