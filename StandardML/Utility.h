@@ -83,20 +83,7 @@ enum Token {
 
 namespace {
 
-	// error handle
-	void LexerError(const char* info) {
-		// clean buffs of keyboard
-
-		fprintf(stdout, "Lexer Error: %s\n", info);
-	}
-
-	unique_ptr<ExprAST> ParserError(const char* info) {
-		// clean buffs of keyboard
-
-		fprintf(stdout, "Lexer Error: %s\n", info);
-		return nullptr;
-	}
-
+	
 	 //Abstract Syntax Tree (aka Parse Tree)
 
 	/*----------------father class----------------*/
@@ -237,5 +224,19 @@ namespace {
 		ValueDecAST(const string& ValName, unique_ptr<ExprAST> ValExpr)
 			: ValName(ValName), ValExpr(move(ValExpr)) {}
 	};
+
+	// error handle
+	void LexerError(const char* info) {
+		// clean buffs of keyboard
+
+		fprintf(stdout, "Lexer Error: %s\n", info);
+	}
+
+	unique_ptr<ExprAST> ParserError(const char* info) {
+		// clean buffs of keyboard
+
+		fprintf(stdout, "Parser Error: %s\n", info);
+		return nullptr;
+	}
 
 }

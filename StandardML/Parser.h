@@ -74,7 +74,7 @@ private:
 	/*----------------Function----------------*/
 	/// Prototype
 	///   ::= id '(' ')'
-	///   ::= id '(' id (',' id)* ')'
+	///   ::= id '(' id ( ',' id )* ')'
 	///   ::= id id
 	unique_ptr<PrototypeAST> ParsePrototype();
 	/// Function ::= tok_fun Prototype '=' Expression
