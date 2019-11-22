@@ -57,7 +57,8 @@ private:
 	/*----------------Binary Expression----------------*/
 	/// BinaryExpr
 	///   ::= (Op PrimaryExpr)*	
-	unique_ptr<ExprAST> ParseBinaryExpr();
+	unique_ptr<ExprAST> ParseBinaryExpr(int ExprPrec,
+		std::unique_ptr<ExprAST> LHS);
 
 	/*--------------Expression(top level)--------------*/
 	/// Expression 

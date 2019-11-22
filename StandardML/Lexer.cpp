@@ -5,7 +5,6 @@
 
 #include "Lexer.h"
 
-
 //Ê¶±ð·ûºÅ
 bool Lexer::issymble(int LastChar) {
 	return LastChar == '!' || LastChar == '%' || LastChar == '&' ||
