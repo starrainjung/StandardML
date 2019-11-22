@@ -1,7 +1,7 @@
 /*---------------------------------------------------
 	this file contains the common tools
 
-	TODO：1.出错处理（错误归类；tok_error直接清空键盘缓冲区）
+	TODO: 1.error handle(when tok_error, clean the keyboard buffers)
 
 	NOTE: 1.default Binary oprerators: div mod andalso orelse
 		  2.default datatype: bool int real real char string(can be defined as variable)
@@ -9,10 +9,28 @@
 ---------------------------------------------------*/
 
 #pragma once
-#include<memory>
-#include<string>
-#include<vector>
-#include<map>
+#include <algorithm>
+#include <cctype>
+#include <cstdio>
+#include <cstdlib>
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
+#include <llvm/ADT/APInt.h>
+#include <llvm/ADT/APFloat.h>
+#include <llvm/ADT/STLExtras.h>
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Constants.h>
+#include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/Type.h>
+#include <llvm/IR/Verifier.h>
+
+using namespace llvm;
 using namespace std;
 
 // The lexer returns tokens [0-255] if it is an unknown character, otherwise one
@@ -92,6 +110,7 @@ namespace {
 	class AST {
 	public:
 		virtual ~AST() = default;
+		virtual Value *codegen() = 0;
 	};
 
 	/// DecAST - Base class for all declaration
@@ -104,6 +123,7 @@ namespace {
 	class ExprAST : public AST {
 	public:
 		virtual ~ExprAST() = default;
+		virtual Value *codegen() = 0;
 	};
 
 	///TypeAST - Base class for all type
@@ -123,26 +143,35 @@ namespace {
 		bool BoolVal;
 	public:
 		BoolExprAST(bool BoolVal) : BoolVal(BoolVal) {}
+		Value *codegen() override;
 	};
+
 	class IntExprAST : public ExprAST {
 		int IntVal;
 	public:
 		IntExprAST(int IntVal) : IntVal(IntVal) {}
+		Value *codegen() override;
 	};
+
 	class RealExprAST : public ExprAST {
 		double RealVal;
 	public:
 		RealExprAST(double RealVal) : RealVal(RealVal) {}
+		Value *codegen() override;
 	};
+
 	class CharExprAST : public ExprAST {
 		char CharVal;
 	public:
 		CharExprAST(char CharVal) : CharVal(CharVal) {}
+		Value *codegen() override;
 	};
+
 	class StringExprAST : public ExprAST {
 		string StrVal;
 	public:
 		StringExprAST(const string &StrVal) : StrVal(StrVal) {}
+		Value *codegen() override;
 	};
 
 	/*----------------variable and call----------------*/
@@ -151,6 +180,7 @@ namespace {
 		string VariName;
 	public:
 		VariableExprAST(const string &VariName) : VariName(VariName) {}
+		Value *codegen() override;
 	};
 	/// CallExprAST - Expression class for function calls.
 	class CallExprAST : public ExprAST {
@@ -160,6 +190,7 @@ namespace {
 	public:
 		CallExprAST(const string& Callee, vector<unique_ptr<ExprAST>> Args)
 			: Callee(Callee), Args(move(Args)) {}
+		Value *codegen() override;
 	};
 
 	/*----------------If and Let Expression----------------*/
@@ -170,7 +201,7 @@ namespace {
 		IfExprAST(unique_ptr<ExprAST> IfExpr, unique_ptr<ExprAST> ThenExpr,
 			unique_ptr<ExprAST> ElseExpr)
 			: IfExpr(move(IfExpr)), ThenExpr(move(ThenExpr)), ElseExpr(move(ElseExpr)) {}
-
+		Value *codegen() override;
 	};
 	/// LetExprAST - let dec in expr(;expr)* end
 	class LetExprAST : public ExprAST {
@@ -179,6 +210,7 @@ namespace {
 	public:
 		LetExprAST(unique_ptr<DecAST> LetDec, vector<unique_ptr<ExprAST>> InExprs)
 			: LetDec(move(LetDec)), InExprs(move(InExprs)) {}
+		Value *codegen() override;
 	};
 
 	/// BinaryExprAST - Expression class for a binary operator.
@@ -190,6 +222,7 @@ namespace {
 		BinaryExprAST(const string &Op, unique_ptr<ExprAST> LHS,
 			unique_ptr<ExprAST> RHS)
 			: Op(Op), LHS(move(LHS)), RHS(move(RHS)) {}
+		Value *codegen() override;
 	};
 
 	/*-------------------------------------------
@@ -207,7 +240,8 @@ namespace {
 	public:
 		PrototypeAST(const string& Name, vector<string> Args)
 			: FuncName(Name), Args(move(Args)) {}
-
+		
+		Function* codegen();
 		const string& getName() const { return FuncName; }
 	};
 
@@ -220,6 +254,7 @@ namespace {
 		FunctionDecAST(unique_ptr<PrototypeAST> Proto,
 			unique_ptr<ExprAST> Body)
 			: Proto(move(Proto)), Body(move(Body)) {}
+		Function *codegen();
 	};
 
 	/*----------------value----------------*/
@@ -230,22 +265,33 @@ namespace {
 	public:
 		ValueDecAST(const string& ValName, unique_ptr<ExprAST> ValExpr)
 			: ValName(ValName), ValExpr(move(ValExpr)) {}
+		
 	};
 
-	/*----------------Error Handle----------------*/
-	int LexerError(const char* info) {
+
+
+	/*-------------------------------------------
+					Error Handle
+	-------------------------------------------*/
+
+	int LexerError(const char *info) {
 		// clean buffer of keyboard
 
 		fprintf(stdout, "Lexer Error: %s\n", info);
 		return tok_error;
 	}
 
-	unique_ptr<AST> ParserError(const char* info) {
+	unique_ptr<AST> ParserError(const char *info) {
 		// clean buffer of keyboard
 
-		fprintf(stdout, "Lexer Error: %s\n", info);
+		fprintf(stdout, "Parser Error: %s\n", info);
 		return nullptr;
 	}
 
+	Value *CodeGenError(const char *info){
+		// clean buffer of keyboard
+		
+		fprintf(stdout, "CodeGen Error: %s\n", info);
+	}
 
 }
