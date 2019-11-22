@@ -356,7 +356,6 @@ unique_ptr<ExprAST> Parser::ParseBinaryExpr(int ExprPrec,
 	}
 }
 
-
 ///   ::= IfExpr
 ///   ::= PrimaryExpr BinaryExpr
 unique_ptr<ExprAST> Parser::ParseExpression()
@@ -371,16 +370,75 @@ unique_ptr<ExprAST> Parser::ParseExpression()
 
 		return ParseBinaryExpr(0, std::move(LHS));
 	}
-}
-
-
-
-
-
+	
+	
 /*-------------------------------------------
-					declaration
-	-------------------------------------------*/
-unique_ptr<DecAST> Parser::ParseFunction()
-{
-	return unique_ptr<DecAST>();
+				declaration
+-------------------------------------------*/
+/*----------------Function----------------*/
+/// Prototype
+///   ::= id '(' ')'
+///   ::= id '(' id ( ',' id )* ')'
+///   ::= id id
+unique_ptr<PrototypeAST> Parser::ParsePrototype() {
+
+	if (CurTok != tok_identifier) {
+		ParserError("Expected function name in prototype");
+		return nullptr;
+	}
+
+	std::string FuncName = lexer.IdentifierStr;
+	std::vector<string> Args;
+
+	getNextToken();//eat identifier
+
+	if (CurTok != '(') {//
+		ParserError("Expected '('in prototype");
+		return nullptr;
+	}
+
+	while (getNextToken() == tok_identifier)
+		Args.push_back(lexer.IdentifierStr);
+
+	if (CurTok != ')') {//
+			ParserError("Expected ')'in prototype");
+			return nullptr;
+		}//eat )
+	return std::make_unique<PrototypeAST>(FuncName, Args);
 }
+/// Function ::= tok_fun Prototype '=' Expression
+unique_ptr<DecAST> Parser::ParseFunction() {
+	getNextToken();//eat def
+	auto Proto = ParsePrototype();
+	if (!Proto) return nullptr;
+
+	if (CurTok != '=') {//
+		ParserError("Expected '=' in declaration");
+		return nullptr;
+	}
+	if (auto E = ParseExpression())
+		return std::make_unique<FunctionDecAST>(std::move(Proto), std::move(E));
+	return nullptr;
+}
+
+/*-----------------value-----------------*/
+/// Value ::= tok_val id '=' Expression
+unique_ptr<DecAST> Parser::ParseValue() {
+	getNextToken();//eat val
+	if (CurTok != tok_identifier) {
+		ParserError("Expected identifier name in expression");
+		return nullptr;
+	}
+	getNextToken();//eat identifier
+
+	if (CurTok != '=') {
+		ParserError("Expected '=' in prototype");
+		return nullptr;
+	}
+	getNextToken();//eat =
+
+	auto expr = ParseParenExpr();
+	return nullptr;
+}
+
+

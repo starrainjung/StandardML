@@ -101,7 +101,6 @@ enum Token {
 
 namespace {
 
-	
 	/*-------------------------------------------
 		Abstract Syntax Tree (aka Parse Tree)
 	-------------------------------------------*/
@@ -269,7 +268,6 @@ namespace {
 	};
 
 
-
 	/*-------------------------------------------
 					Error Handle
 	-------------------------------------------*/
@@ -292,6 +290,7 @@ namespace {
 		// clean buffer of keyboard
 		
 		fprintf(stdout, "CodeGen Error: %s\n", info);
+		return nullptr;
 	}
 
 }
