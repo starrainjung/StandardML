@@ -1,11 +1,19 @@
 /*---------------------------------------------------
 	this file contains the common tools
 
-	TODO: 1.error handle(when tok_error, clean the keyboard buffers)
-
-	NOTE: 1.default Binary oprerators: div mod andalso orelse
-		  2.default datatype: bool int real real char string(can be defined as variable)
-
+	TODO: 
+		1.error handle(when error, withdraw class and code genarate)
+		2.same name handle(cover)
+		3.type of patt or expr
+	NOTE:
+		1.default datatype: 
+			tuple(include unit) record bool int real char string
+		2.default Binary operators: 
+			bool: andalso orelse = <> (notº¯Êý?)
+			int: + - * div mod < > = <> >= <=
+			real: + - * / < > = <> >= <=
+			char: = <> <= >=
+			string: ^ = <> <= >=
 ---------------------------------------------------*/
 
 #pragma once
@@ -94,10 +102,10 @@ enum Token {
 	tok_signature = -52,
 	tok_struct = -53,
 	tok_structure = -54,
+	tok_div = -55,
+	tok_mod = -57,
 
 };
-
-
 
 namespace {
 
@@ -106,93 +114,140 @@ namespace {
 	-------------------------------------------*/
 
 	/*----------------father class----------------*/
-	class AST {
+
+	///TypeAST - type of single pattern or single expression
+	///		   - type of multiple pattern or paren expression			
+	class TypeAST {
+	protected:
+		string TypeName;
+		vector<unique_ptr<TypeAST>> Contents;
 	public:
-		virtual ~AST() = default;
-		virtual Value *codegen() = 0;
+		TypeAST(const string& TypeName, vector<unique_ptr<TypeAST>> Contents)
+			: TypeName(TypeName), Contents(Contents) {}
+		virtual ~TypeAST() = default;
+		bool FitType(const TypeAST* Type);
+		const string& getTypeName() { return TypeName; }
 	};
 
-	/// DecAST - Base class for all declaration
-	class DecAST : public AST {
+	/// DecAST - Base class for all declaration nodes
+	class DecAST {
 	public:
 		virtual ~DecAST() = default;
 	};
 
 	/// ExprAST - Base class for all expression nodes.
-	class ExprAST : public AST {
+	class ExprAST {
+	protected:
+		
 	public:
+		unique_ptr<TypeAST> ExprType = nullptr;
 		virtual ~ExprAST() = default;
-		virtual Value *codegen() = 0;
+		virtual Value* codegen() = 0;
 	};
 
-	///TypeAST - Base class for all type
-	/*class TypeAST {
-		string TypeName;
+	/// PattAST = Base class for all pattern nodes
+	class PattAST {
+	protected:
+		
 	public:
-		TypeAST(const string& TypeName) : TypeName(TypeName) {}
-		virtual ~TypeAST() = default;
-	};*/
+		unique_ptr<TypeAST> PattType = nullptr;
+		virtual ~PattAST() = default;
+	};
+
 
 	/*-------------------------------------------
 					expression
 	-------------------------------------------*/
 
-	/*----------------constant----------------*/
+	/*----------------Constant Expression----------------*/
 	class BoolExprAST : public ExprAST {
 		bool BoolVal;
 	public:
 		BoolExprAST(bool BoolVal) : BoolVal(BoolVal) {}
-		Value *codegen() override;
+		Value* codegen() override;
 	};
 
 	class IntExprAST : public ExprAST {
 		int IntVal;
 	public:
 		IntExprAST(int IntVal) : IntVal(IntVal) {}
-		Value *codegen() override;
+		Value* codegen() override;
 	};
 
 	class RealExprAST : public ExprAST {
 		double RealVal;
 	public:
 		RealExprAST(double RealVal) : RealVal(RealVal) {}
-		Value *codegen() override;
+		Value* codegen() override;
 	};
 
 	class CharExprAST : public ExprAST {
 		char CharVal;
 	public:
 		CharExprAST(char CharVal) : CharVal(CharVal) {}
-		Value *codegen() override;
+		Value* codegen() override;
 	};
 
 	class StringExprAST : public ExprAST {
 		string StrVal;
 	public:
-		StringExprAST(const string &StrVal) : StrVal(StrVal) {}
-		Value *codegen() override;
+		StringExprAST(const string& StrVal) : StrVal(StrVal) {}
+		Value* codegen() override;
 	};
 
-	/*----------------variable and call----------------*/
+	/*----------------variable, Paren, Call and Let----------------*/
+
 	/// VariableExprAST - name of value 
 	class VariableExprAST : public ExprAST {
 		string VariName;
 	public:
-		VariableExprAST(const string &VariName) : VariName(VariName) {}
-		Value *codegen() override;
+		VariableExprAST(const string& VariName) : VariName(VariName) {}
+		Value* codegen() override;
 	};
+
+	/// ParenExprAST - '(' expr ',' expr (',' expr)* ')'
+	///				 - '(' ')'
+	class ParenExprAST : public ExprAST {
+		vector<unique_ptr<ExprAST>> Contents;
+	public:
+		ParenExprAST(vector<unique_ptr<ExprAST>> Contents)
+			: Contents(move(Contents)) {}
+		Value* codegen() override;
+	};
+
 	/// CallExprAST - Expression class for function calls.
 	class CallExprAST : public ExprAST {
 		string Callee;
-		vector<unique_ptr<ExprAST>> Args;
-
+		unique_ptr<ExprAST> Args;
 	public:
-		CallExprAST(const string& Callee, vector<unique_ptr<ExprAST>> Args)
+		CallExprAST(const string& Callee, unique_ptr<ExprAST> Args)
 			: Callee(Callee), Args(move(Args)) {}
-		Value *codegen() override;
+		Value* codegen() override;
 	};
 
-	/*----------------If and Let Expression----------------*/
+	/// LetExprAST - let dec in expr end
+	class LetExprAST : public ExprAST {
+		unique_ptr<DecAST> LetDec;
+		unique_ptr<ExprAST> InExpr;
+	public:
+		LetExprAST(unique_ptr<DecAST> LetDec, unique_ptr<ExprAST> InExpr)
+			: LetDec(move(LetDec)), InExpr(move(InExpr)) {}
+		Value* codegen() override;
+	};
+
+	/*----------------Binary and If Expression----------------*/
+	/// BinaryExprAST - Expression class for a binary operator.
+	/// include default binary(infix) operators and user-defined binary operators
+	class BinaryExprAST : public ExprAST {
+		int Op;
+		unique_ptr<ExprAST> LHS, RHS;
+	public:
+		BinaryExprAST(const int& Op, unique_ptr<ExprAST> LHS,
+			unique_ptr<ExprAST> RHS)
+			: Op(Op), LHS(move(LHS)), RHS(move(RHS)) {}
+		Value* codegen() override;
+	};
+
 	/// IfExprAST - if expr then expr else expr
 	class IfExprAST : public ExprAST {
 		unique_ptr<ExprAST> IfExpr, ThenExpr, ElseExpr;
@@ -200,71 +255,57 @@ namespace {
 		IfExprAST(unique_ptr<ExprAST> IfExpr, unique_ptr<ExprAST> ThenExpr,
 			unique_ptr<ExprAST> ElseExpr)
 			: IfExpr(move(IfExpr)), ThenExpr(move(ThenExpr)), ElseExpr(move(ElseExpr)) {}
-		Value *codegen() override;
-	};
-	/// LetExprAST - let dec in expr(;expr)* end
-	class LetExprAST : public ExprAST {
-		unique_ptr<DecAST> LetDec;
-		vector<unique_ptr<ExprAST>> InExprs;
-	public:
-		LetExprAST(unique_ptr<DecAST> LetDec, vector<unique_ptr<ExprAST>> InExprs)
-			: LetDec(move(LetDec)), InExprs(move(InExprs)) {}
-		Value *codegen() override;
+		Value* codegen() override;
 	};
 
-	/// BinaryExprAST - Expression class for a binary operator.
-	/// include default binary(infix) operators and user-defined binary operators
-	class BinaryExprAST : public ExprAST {
-		string Op;
-		unique_ptr<ExprAST> LHS, RHS;
-	public:
-		BinaryExprAST(const string &Op, unique_ptr<ExprAST> LHS,
-			unique_ptr<ExprAST> RHS)
-			: Op(Op), LHS(move(LHS)), RHS(move(RHS)) {}
-		Value *codegen() override;
-	};
 
 	/*-------------------------------------------
 					declaration
 	-------------------------------------------*/
 
-	/*----------------function----------------*/
-	/// PrototypeAST - This class represents the "prototype" for a function,
-	/// which captures its name, and its argument names (thus implicitly the number
-	/// of arguments the function takes).
-	class PrototypeAST {
-		string FuncName;
-		vector<string> Args;
-
-	public:
-		PrototypeAST(const string& Name, vector<string> Args)
-			: FuncName(Name), Args(move(Args)) {}
-		
-		Function* codegen();
-		const string& getName() const { return FuncName; }
-	};
-
-	/// FunctionDecAST - This class represents a function definition itself.
-	class FunctionDecAST : public DecAST {
-		unique_ptr<PrototypeAST> Proto;
-		unique_ptr<ExprAST> Body;
-
-	public:
-		FunctionDecAST(unique_ptr<PrototypeAST> Proto,
-			unique_ptr<ExprAST> Body)
-			: Proto(move(Proto)), Body(move(Body)) {}
-		Function *codegen();
-	};
-
 	/*----------------value----------------*/
 	/// ValueDecAST - name a expression value
 	class ValueDecAST : public DecAST {
-		string ValName;
+		unique_ptr<PattAST> ValPatt;
 		unique_ptr<ExprAST> ValExpr;
 	public:
-		ValueDecAST(const string& ValName, unique_ptr<ExprAST> ValExpr)
-			: ValName(ValName), ValExpr(move(ValExpr)) {}
-		
+		ValueDecAST(unique_ptr<PattAST> ValPatt, unique_ptr<ExprAST> ValExpr)
+			: ValPatt(move(ValPatt)), ValExpr(move(ValExpr)) {}
+	};
+
+
+	/*----------------function----------------*/
+	/// FunctionDecAST - This class represents a function definition itself.
+	class FunctionDecAST : public DecAST {
+		string FuncName;
+		unique_ptr<PattAST> FuncPatt;
+		unique_ptr<ExprAST> FuncBody;
+		unique_ptr<TypeAST> RetType;
+	public:
+		FunctionDecAST(const string& FuncName, unique_ptr<PattAST> FuncPatt,
+			unique_ptr<ExprAST> FuncBody, unique_ptr<TypeAST> RetType = nullptr)
+			: FuncName(FuncName), FuncPatt(move(FuncPatt)), FuncBody(move(FuncBody)), RetType(move(RetType)) {}
+		Function* codegen();
+	};
+
+
+	/*-------------------------------------------
+					  pattern
+	-------------------------------------------*/
+
+	/// SinglePattAST - pattern of single Variable
+	class SinglePattAST : public PattAST {
+		string VariName;
+	public:
+		SinglePattAST(const string& VariName) : VariName(VariName) {}
+	};
+
+	/// MultiplePattAST - pattern of multiple variable
+	class MultiplePattAST : public PattAST {
+		vector<unique_ptr<PattAST>> Contents;
+	public:
+		MultiplePattAST(vector<unique_ptr<PattAST>> Contents)
+			: Contents(move(Contents)) {}
 	};
 
 
@@ -272,23 +313,26 @@ namespace {
 					Error Handle
 	-------------------------------------------*/
 
-	int LexerError(const char *info) {
-		// clean buffer of keyboard
+	//==----------------------------------------------------==//
+	//	NOTE: three other ways of clean buffer
+	//	 1.fflush(stdin);
+	//	 2.scanf("%*[^\n]%*c");
+	//	 3.int tmpBuf;
+	//	   while ((tmpBuf = getchar()) != '\n' && tmpBuf != EOF);
+	//==----------------------------------------------------==//
 
+	int LexerError(const char* info) {
+		// clean buffer of keyboard
+		fflush(stdin);
 		fprintf(stdout, "Lexer Error: %s\n", info);
 		return tok_error;
 	}
 
-	unique_ptr<AST> ParserError(const char *info) {
-		// clean buffer of keyboard
+	
 
-		fprintf(stdout, "Parser Error: %s\n", info);
-		return nullptr;
-	}
-
-	Value *CodeGenError(const char *info){
+	Value* CodeGenError(const char* info) {
 		// clean buffer of keyboard
-		
+		fflush(stdin);
 		fprintf(stdout, "CodeGen Error: %s\n", info);
 		return nullptr;
 	}

@@ -5,6 +5,24 @@ static IRBuilder<> Builder(TheContext);
 static unique_ptr<Module> TheModule;
 static map<string, Value*> NamedValues;
 
+bool TypeAST::FitType(const TypeAST* Type) {
+	//type name is not equal
+	if (this->TypeName != Type->TypeName)
+		return false;
+	//check contents in tuple type
+	if (this->TypeName == "tuple") {
+		//check contents size
+		if (this->Contents.size() != Type->Contents.size())
+			return false;
+		//check every contents
+		for (unsigned i = 0; i < this->Contents.size(); i++)
+			if (!Contents[i]->FitType(Type))
+				return false;
+	}
+	// if fit return true
+	return true;
+}
+
 /*-------------------------------------------
 		  CodeGen for expression
 -------------------------------------------*/
@@ -29,7 +47,7 @@ Value* CharExprAST::codegen(){
 }
 
 Value *StringExprAST::codegen() {
-
+	return;
 }
 
 Value* VariableExprAST::codegen() {
@@ -41,11 +59,20 @@ Value* VariableExprAST::codegen() {
 }
 
 Value* BinaryExprAST::codegen() {
+	if (!LHS->ExprType->FitType(RHS->ExprType.get()))
+		return CodeGenError("type not fetch in binary expression");
+	
+	string TypeName = LHS->ExprType->getTypeName();
 	Value* L = LHS->codegen();
 	Value* R = RHS->codegen();
-
 	if (!L || !R)
 		return nullptr;
+
+	switch (Op) {
+	case:
+		
+	}
+
 	
 
 }
@@ -74,10 +101,13 @@ Value* CallExprAST::codegen() {
 		  CodeGen for declaration
 -------------------------------------------*/
 
-Function* PrototypeAST::codegen() {
 
-}
 
 Function* FunctionDecAST::codegen() {
+	if (Function* exitFunction = TheModule->getFunction(FuncName)) {
+		TheModule->
+	}
+
+
 
 }
