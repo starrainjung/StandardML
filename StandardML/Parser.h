@@ -2,30 +2,28 @@
 	the head file of Parser	
 ---------------------------------------------------*/
 
-#pragma once
+#ifndef PARSER_H
+
+#define PARSER_H
+
 #include "Utility.h"
 #include "Lexer.h"
 
-class Parser
-{
-public:
-	Lexer lexer;
-private:
+class Lexer;
 
-	int CurTok = 0;
-	map<int, int> BinopPrecedence = {
-		{tok_andalso,10}, {tok_orelse,10}, {'<',20}, {'>',20}, {'<>',20}, {'<=',20},
-		{'>=',20}, {'=', 20}, {'+',30}, {'-',30}, {'^',30}, {'*',40}, {tok_div,40}, {'/',40}
-	};
-	int getNextToken() { return CurTok = lexer.gettok(); }
+class Parser {
+
+	int CurTok;
+	map<int, int> BinopPrecedence;
+
 	int GetTokPrecedence();
-	
+
 	// get the value of lexer member
-	const string& getIdentifierStr() { return lexer.getIdentifierStr; }
-	const char& getCharVal() { return lexer.getCharVal; }
-	const string& getStrVal() { return lexer.getStrVal; }
-	const double& getNumVal() { return lexer.getNumVal; }
-	const bool& getBoolVal() { return lexer.getBoolVal; }
+	const string& getIdentifierStr() { return lexer.getIdentifierStr(); }
+	const char& getCharVal() { return lexer.getCharVal(); }
+	const string& getStrVal() { return lexer.getStrVal(); }
+	const double& getNumVal() { return lexer.getNumVal(); }
+	const bool& getBoolVal() { return lexer.getBoolVal(); }
 
 	/*-------------------------------------------
 					expression
@@ -52,14 +50,14 @@ private:
 	/// LetExpr ::= tok_let Declartion tok_in Expression tok_end
 	unique_ptr<ExprAST> ParseLetExpr();
 
-	
+
 	/// PrimaryExpr
 	///   ::= VariableExpr
 	///   ::= ConstExpr
 	///   ::= LetExpr
 	///   ::= ParenExpr
 	unique_ptr<ExprAST> ParsePrimaryExpr();
-	
+
 	/// BinaryExpr ::= (Op PrimaryExpr)*	
 	unique_ptr<ExprAST> ParseBinaryExpr(int ExprPrec,
 		std::unique_ptr<ExprAST> LHS);
@@ -78,10 +76,10 @@ private:
 	-------------------------------------------*/
 
 	/// Function ::= tok_fun id Patt (':' Type) '=' Expression
-	unique_ptr<DecAST> ParseFunction();
+	unique_ptr<FunctionDecAST> ParseFunction();
 
 	/// Value ::= tok_val Patt '=' Expression
-	unique_ptr<DecAST> ParseValue();
+	unique_ptr<ValueDecAST> ParseValue();
 
 	/// Declaration ::= Function
 	///				::= Value
@@ -89,13 +87,13 @@ private:
 
 	/*-------------------------------------------
 					  pattern
-	-------------------------------------------*/	
+	-------------------------------------------*/
 
 	/// SinglePatt ::= id
 	unique_ptr<PattAST> ParseSinglePatt();
 
 	/// MutiPatt ::= '(' ')' | '(' Patt (',' Patt)* ')'
-	unique_ptr<PattAST> ParseMutiPatt();
+	unique_ptr<PattAST> ParseParenPatt();
 
 	/// Patt ::= singlePatt (':' Type)
 	///		 ::= MutiPatt (':' Type)
@@ -106,47 +104,36 @@ private:
 	-------------------------------------------*/
 
 	/// SingleType ::= bool | int | real | char | string | unit
-	unique_ptr<TypeAST> ParseSingleType();
-		
+	TypeAST* ParseSingleType();
+
 	/// ParenType ::= '(' Type ')'
-	unique_ptr<TypeAST> ParseParenType();
+	TypeAST* ParseParenType();
 
 	/// PrimaryType ::= SingleType
 	///				::= ParenType
-	unique_ptr<TypeAST> ParsePrimaryType();
+	TypeAST* ParsePrimaryType();
 
-	/// Type ::= PrimaryType ('*' PrimaryType)*
-	unique_ptr<TypeAST> ParseType();
+	/// Type ::= PrimaryType ('*' Type)*
+	TypeAST* ParseType();
 
-	/*-------------------------------------------
-					Error Handle
-	-------------------------------------------*/
-	unique_ptr<ExprAST> ParserExprError(const char* info) {
-		// clean buffer of keyboard
-		fflush(stdin);
-		fprintf(stdout, "Parser Error: %s\n", info);
-		return nullptr;
-	}
+	void HandleDeclaration();
+	void HandleTopLevelExpression();
 
-	unique_ptr<DecAST> ParserDecError(const char* info) {
-		// clean buffer of keyboard
-		fflush(stdin);	
-		fprintf(stdout, "Parser Error: %s\n", info);
-		return nullptr;
-	}
 
-	unique_ptr<PattAST> ParserPattError(const char* info) {
-		// clean buffer of keyboard
-		fflush(stdin);	
-		fprintf(stdout, "Parser Error: %s\n", info);
-		return nullptr;
-	}
+public:
 
-	unique_ptr<TypeAST> ParserTypeError(const char* info) {
-		// clean buffer of keyboard
-		fflush(stdin);
-		fprintf(stdout, "Parser Error: %s\n", info);
-		return nullptr;
+	Lexer lexer;
+	void MainLoop();
+	void resetLastChar() { lexer.resetLastChar(); }
+	int getNextToken() { return CurTok = lexer.gettok(); }
+	void InitializeModuleAndPassManager();
+	Parser() {
+		this->BinopPrecedence = {
+	   {tok_andalso,10}, {tok_orelse,10}, {'<',20}, {'>',20}, {'<>',20}, {'<=',20},
+	   {'>=',20}, {'=', 20}, {'+',30}, {'-',30}, {'^',30}, {'*',40}, {tok_div,40}, {'/',40}
+		};
+		this->CurTok = 0;
 	}
 };
 
+#endif // !PARSER_H

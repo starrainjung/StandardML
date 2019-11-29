@@ -16,96 +16,45 @@
 			string: ^ = <> <= >=
 ---------------------------------------------------*/
 
-#pragma once
+#ifndef UTILITY_H
+
+#define UTILITY_H
+
+#include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/Type.h"
+#include "llvm/IR/Verifier.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Target/TargetMachine.h"
+#include "llvm/Transforms/InstCombine/InstCombine.h"
+#include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Scalar/GVN.h"
 #include <algorithm>
+#include <cassert>
 #include <cctype>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <map>
 #include <memory>
 #include <string>
 #include <vector>
-#include <llvm/ADT/APInt.h>
-#include <llvm/ADT/APFloat.h>
-#include <llvm/ADT/STLExtras.h>
-#include <llvm/IR/BasicBlock.h>
-#include <llvm/IR/Constants.h>
-#include <llvm/IR/DerivedTypes.h>
-#include <llvm/IR/Function.h>
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/Module.h>
-#include <llvm/IR/Type.h>
-#include <llvm/IR/Verifier.h>
+#include "SMLJIT.h"
+#include "Token.h"
 
 using namespace llvm;
+using namespace llvm::orc;
 using namespace std;
 
-// The lexer returns tokens [0-255] if it is an unknown character, otherwise one
-// of these for known things.
-enum Token {
-
-	//exit
-	tok_exit = -1,
-	//error
-	tok_error = -2,
-
-	// identify
-	tok_identifier = -4,
-
-	// datatype of constant
-	tok_bool = -10,
-	tok_int = -11,
-	tok_real = -12,
-	tok_char = -13,
-	tok_string = -14,
-
-	// keywords
-	tok_val = -15,
-	tok_fn = -16,
-	tok_fun = -17,
-	tok_functor = -55,
-	tok_type = -18,
-	tok_datatype = -19,
-	tok_abstype = -20,
-	tok_eqtype = -21,
-	tok_withtype = -22,
-	tok_handle = -23,
-	tok_infix = -24,
-	tok_nonfix = -25,
-	tok_infixr = -26,
-	tok_local = -27,
-	tok_sharing = -28,
-	tok_and = -29,
-	tok_as = -30,
-	tok_with = -31,
-	tok_then = -32,
-	tok_where = -33,
-	tok_include = -34,
-	tok_of = -35,
-	tok_open = -36,
-	tok_op = -37,
-	tok_raise = -38,
-	tok_rec = -39,
-	tok_exception = -40,
-	tok_andalso = -41,
-	tok_orelse = -42,
-	tok_do = -43,
-	tok_while = -44,
-	tok_if = -45,
-	tok_else = -46,
-	tok_case = -47,
-	tok_let = -48,
-	tok_in = -49,
-	tok_end = -50,
-	tok_sig = -51,
-	tok_signature = -52,
-	tok_struct = -53,
-	tok_structure = -54,
-	tok_div = -55,
-	tok_mod = -57,
-
-};
+class Parser;
 
 namespace {
 
@@ -120,46 +69,51 @@ namespace {
 	class TypeAST {
 	protected:
 		string TypeName;
-		vector<unique_ptr<TypeAST>> Contents;
+		vector<TypeAST*> Contents;
 	public:
-		TypeAST(const string& TypeName, vector<unique_ptr<TypeAST>> Contents)
-			: TypeName(TypeName), Contents(Contents) {}
+		TypeAST(const string& TypeName, vector<TypeAST*> Contents)
+			: TypeName(TypeName), Contents(move(Contents)) {}
 		virtual ~TypeAST() = default;
 		bool FitType(const TypeAST* Type);
 		const string& getTypeName() { return TypeName; }
+	};
+
+	/// PattAST - Base class for all pattern nodes
+	class PattAST {
+		string PattName;
+	public:
+		bool isSingle;
+		vector<unique_ptr<PattAST>> Contents;
+		TypeAST* PattType = nullptr;
+		PattAST(const string& PattName, bool isSingle) : PattName(PattName), isSingle(isSingle) {}
+		virtual ~PattAST() = default;
+		const string& getPattName() { return PattName; }
 	};
 
 	/// DecAST - Base class for all declaration nodes
 	class DecAST {
 	public:
 		virtual ~DecAST() = default;
+
 	};
 
 	/// ExprAST - Base class for all expression nodes.
 	class ExprAST {
 	protected:
-		
+
 	public:
-		unique_ptr<TypeAST> ExprType = nullptr;
+		bool isSingle = 1;
+		TypeAST* ExprType = nullptr;
 		virtual ~ExprAST() = default;
 		virtual Value* codegen() = 0;
 	};
-
-	/// PattAST = Base class for all pattern nodes
-	class PattAST {
-	protected:
-		
-	public:
-		unique_ptr<TypeAST> PattType = nullptr;
-		virtual ~PattAST() = default;
-	};
-
 
 	/*-------------------------------------------
 					expression
 	-------------------------------------------*/
 
 	/*----------------Constant Expression----------------*/
+	/// only Constant can define type in Parser
 	class BoolExprAST : public ExprAST {
 		bool BoolVal;
 	public:
@@ -196,7 +150,6 @@ namespace {
 	};
 
 	/*----------------variable, Paren, Call and Let----------------*/
-
 	/// VariableExprAST - name of value 
 	class VariableExprAST : public ExprAST {
 		string VariName;
@@ -215,15 +168,17 @@ namespace {
 		Value* codegen() override;
 	};
 
+	/// define type in codegen
 	/// CallExprAST - Expression class for function calls.
 	class CallExprAST : public ExprAST {
 		string Callee;
-		unique_ptr<ExprAST> Args;
+		vector<unique_ptr<ExprAST>> Args;
 	public:
-		CallExprAST(const string& Callee, unique_ptr<ExprAST> Args)
+		CallExprAST(const string& Callee, vector<unique_ptr<ExprAST>> Args)
 			: Callee(Callee), Args(move(Args)) {}
 		Value* codegen() override;
 	};
+
 
 	/// LetExprAST - let dec in expr end
 	class LetExprAST : public ExprAST {
@@ -271,43 +226,47 @@ namespace {
 	public:
 		ValueDecAST(unique_ptr<PattAST> ValPatt, unique_ptr<ExprAST> ValExpr)
 			: ValPatt(move(ValPatt)), ValExpr(move(ValExpr)) {}
+		Value* codegen();
 	};
 
-
 	/*----------------function----------------*/
+	// PrototypeAST - This class represents the "prototype" for a function,
+/// which captures its name, and its argument names (thus implicitly the number
+/// of arguments the function takes).
+	class PrototypeAST : public DecAST {
+		std::string FuncName;
+		unique_ptr<PattAST> FuncPatt;
+		vector<string> ArgsName;
+		vector<string> ArgsType;
+		TypeAST* RetType;
+	public:
+		PrototypeAST(const std::string& FuncName, unique_ptr<PattAST> FuncPatt, TypeAST* RetType)
+			: FuncName(FuncName), FuncPatt(move(FuncPatt)), RetType(RetType) {}
+		Function* codegen();
+		const std::string& getName() const { return FuncName; }
+		void setAgs(PattAST* patt);
+	};
+
 	/// FunctionDecAST - This class represents a function definition itself.
 	class FunctionDecAST : public DecAST {
-		string FuncName;
-		unique_ptr<PattAST> FuncPatt;
+		unique_ptr<PrototypeAST> Proto;
 		unique_ptr<ExprAST> FuncBody;
-		unique_ptr<TypeAST> RetType;
 	public:
-		FunctionDecAST(const string& FuncName, unique_ptr<PattAST> FuncPatt,
-			unique_ptr<ExprAST> FuncBody, unique_ptr<TypeAST> RetType = nullptr)
-			: FuncName(FuncName), FuncPatt(move(FuncPatt)), FuncBody(move(FuncBody)), RetType(move(RetType)) {}
+		FunctionDecAST(unique_ptr<PrototypeAST> Proto, unique_ptr<ExprAST> FuncBody)
+			: Proto(move(Proto)), FuncBody(move(FuncBody)) {}
 		Function* codegen();
 	};
 
-
 	/*-------------------------------------------
-					  pattern
-	-------------------------------------------*/
+							Global
+		-------------------------------------------*/
 
-	/// SinglePattAST - pattern of single Variable
-	class SinglePattAST : public PattAST {
-		string VariName;
-	public:
-		SinglePattAST(const string& VariName) : VariName(VariName) {}
-	};
-
-	/// MultiplePattAST - pattern of multiple variable
-	class MultiplePattAST : public PattAST {
-		vector<unique_ptr<PattAST>> Contents;
-	public:
-		MultiplePattAST(vector<unique_ptr<PattAST>> Contents)
-			: Contents(move(Contents)) {}
-	};
-
+	vector<unique_ptr<TypeAST>> TypeLoop;
+	LLVMContext TheContext;
+	IRBuilder<> Builder(TheContext);
+	unique_ptr<Module> TheModule;
+	std::unique_ptr<legacy::FunctionPassManager> TheFPM;
+	std::unique_ptr<SMLJIT> TheJIT;
 
 	/*-------------------------------------------
 					Error Handle
@@ -321,20 +280,79 @@ namespace {
 	//	   while ((tmpBuf = getchar()) != '\n' && tmpBuf != EOF);
 	//==----------------------------------------------------==//
 
-	int LexerError(const char* info) {
+	
+
+	unique_ptr<ExprAST> ParserExprError(const char* info) {
 		// clean buffer of keyboard
 		fflush(stdin);
-		fprintf(stdout, "Lexer Error: %s\n", info);
-		return tok_error;
+		
+		fprintf(stdout, "Parser Error: %s\n", info);
+		return nullptr;
 	}
 
-	
+	unique_ptr<DecAST> ParserDecError(const char* info) {
+		// clean buffer of keyboard
+		fflush(stdin);
+		
+		fprintf(stdout, "Parser Error: %s\n", info);
+		return nullptr;
+	}
+
+	unique_ptr<FunctionDecAST> ParserFuncDecError(const char* info) {
+		// clean buffer of keyboard
+		fflush(stdin);
+		
+		fprintf(stdout, "Parser Error: %s\n", info);
+		return nullptr;
+	}
+
+	unique_ptr<ValueDecAST> ParserValDecError(const char* info) {
+		// clean buffer of keyboard
+		fflush(stdin);
+		
+		fprintf(stdout, "Parser Error: %s\n", info);
+		return nullptr;
+	}
+
+	unique_ptr<PattAST> ParserPattError(const char* info) {
+		// clean buffer of keyboard
+		fflush(stdin);
+		
+		fprintf(stdout, "Parser Error: %s\n", info);
+		return nullptr;
+	}
+
+	TypeAST* ParserTypeError(const char* info) {
+		// clean buffer of keyboard
+		fflush(stdin);
+		
+		fprintf(stdout, "Parser Error: %s\n", info);
+		return nullptr;
+	}
 
 	Value* CodeGenError(const char* info) {
 		// clean buffer of keyboard
 		fflush(stdin);
+		
 		fprintf(stdout, "CodeGen Error: %s\n", info);
 		return nullptr;
 	}
 
+	Value* CodeGenError(const char* info, const char* extinfo) {
+		// clean buffer of keyboard
+		fflush(stdin);
+		
+		fprintf(stdout, "CodeGen Error: %s%s\n", info, extinfo);
+		return nullptr;
+	}
+
+	Function* FuncCodeGenError(const char* info) {
+		// clean buffer of keyboard
+		fflush(stdin);
+		
+		fprintf(stdout, "CodeGen Error: %s\n", info);
+		return nullptr;
+	}
 }
+
+#endif // !UTILITY_H

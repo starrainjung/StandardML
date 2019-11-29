@@ -5,6 +5,14 @@
 
 #include "Lexer.h"
 
+int Lexer::LexerError(const char* info) {
+	// clean buffer of keyboard
+	fflush(stdin);
+	this->resetLastChar();
+	fprintf(stdout, "Lexer Error: %s\n", info);
+	return tok_error;
+}
+
 //Ê¶±ð·ûºÅ
 bool Lexer::issymble(int LastChar) {
 	return LastChar == '!' || LastChar == '%' || LastChar == '&' ||
