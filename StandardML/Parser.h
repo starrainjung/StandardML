@@ -2,26 +2,33 @@
 	the head file of Parser	
 ---------------------------------------------------*/
 
-#pragma once
+#ifndef PARSER_H
+
+#define PARSER_H
+
 #include "Utility.h"
 #include "Lexer.h"
 
-class Parser
-{
-public:
-	Lexer lexer;
-	
-	
+class Lexer;
 
-private:
-	int CurTok = 0;
-	map<char, int> BinopPrecedence;
-	int getNextToken();
+class Parser {
+
+	int CurTok;
+	map<int, int> BinopPrecedence;
+
 	int GetTokPrecedence();
+
+	// get the value of lexer member
+	const string& getIdentifierStr() { return lexer.getIdentifierStr(); }
+	const char& getCharVal() { return lexer.getCharVal(); }
+	const string& getStrVal() { return lexer.getStrVal(); }
+	const double& getNumVal() { return lexer.getNumVal(); }
+	const bool& getBoolVal() { return lexer.getBoolVal(); }
 
 	/*-------------------------------------------
 					expression
 	-------------------------------------------*/
+
 	/*----------------constant----------------*/
 	// parse bool value
 	unique_ptr<ExprAST> ParseBoolenExpr();
@@ -33,55 +40,100 @@ private:
 	unique_ptr<ExprAST> ParseConstExpr();
 
 	/*------------Variable and function call------------*/
-	/// VariableExpr
-	///   ::= Variable
-	/// NOTE: function call lays below
-	///   ::= Variable Expression
-	///   ::= Variable '(' ')'
-	///   ::= Variable '(' Expression (',' Expression)* ')' 
+	/// VariableExpr ::= Variable
+	///				 ::= Variable Primary
 	unique_ptr<ExprAST> ParseVariableExpr();
 
-	/*---------------If and Let Expression--------------*/
-	/// IfExpr ::= tok_if Expression tok_then Expression tok_else Expression
-	unique_ptr<ExprAST> ParseIfExpr();
-	/// LetExpr ::= tok_let Declartion tok_in Expression (';' Expression)* tok_end
+	/*------------Paren and Let Expression-------------*/
+	/// ParenExpr ::= '(' ')' | '(' Expression (',' Expression)* ')'
+	unique_ptr<ExprAST> ParseParenExpr();
+	/// LetExpr ::= tok_let Declartion tok_in Expression tok_end
 	unique_ptr<ExprAST> ParseLetExpr();
 
-	/*------------Paren and Primary Expression-------------*/
-	/// ParenExpr ::= '(' Expression ')'
-	unique_ptr<ExprAST> ParseParenExpr();
+
 	/// PrimaryExpr
 	///   ::= VariableExpr
 	///   ::= ConstExpr
 	///   ::= LetExpr
 	///   ::= ParenExpr
 	unique_ptr<ExprAST> ParsePrimaryExpr();
-	/*----------------Binary Expression----------------*/
-	/// BinaryExpr
-	///   ::= (Op PrimaryExpr)*	
-	unique_ptr<ExprAST> ParseBinaryExpr();
+
+	/// BinaryExpr ::= (Op PrimaryExpr)*	
+	unique_ptr<ExprAST> ParseBinaryExpr(int ExprPrec,
+		std::unique_ptr<ExprAST> LHS);
+
+	/// IfExpr ::= tok_if Expression tok_then Expression tok_else Expression
+	unique_ptr<ExprAST> ParseIfExpr();
 
 	/*--------------Expression(top level)--------------*/
-	/// Expression 
-	///   ::= IfExpr
-	///   ::= PrimaryExpr BinaryExpr
+	/// Expression ::= IfExpr (':' Type)
+	///			   ::= PrimaryExpr (BinaryExpr)* (':' Type)
 	unique_ptr<ExprAST> ParseExpression();
 
 
 	/*-------------------------------------------
 					declaration
 	-------------------------------------------*/
-	/*----------------Function----------------*/
-	/// Prototype
-	///   ::= id '(' ')'
-	///   ::= id '(' id (',' id)* ')'
-	///   ::= id id
-	unique_ptr<PrototypeAST> ParsePrototype();
-	/// Function ::= tok_fun Prototype '=' Expression
-	unique_ptr<DecAST> ParseFunction();
 
-	/*-----------------value-----------------*/
-	/// Value ::= tok_val id '=' Expression
-	unique_ptr<DecAST> ParseValue();
+	/// Function ::= tok_fun id Patt (':' Type) '=' Expression
+	unique_ptr<FunctionDecAST> ParseFunction();
+
+	/// Value ::= tok_val Patt '=' Expression
+	unique_ptr<ValueDecAST> ParseValue();
+
+	/// Declaration ::= Function
+	///				::= Value
+	unique_ptr<DecAST> ParseDeclaration();
+
+	/*-------------------------------------------
+					  pattern
+	-------------------------------------------*/
+
+	/// SinglePatt ::= id
+	unique_ptr<PattAST> ParseSinglePatt();
+
+	/// MutiPatt ::= '(' ')' | '(' Patt (',' Patt)* ')'
+	unique_ptr<PattAST> ParseParenPatt();
+
+	/// Patt ::= singlePatt (':' Type)
+	///		 ::= MutiPatt (':' Type)
+	unique_ptr<PattAST> ParsePatt();
+
+	/*-------------------------------------------
+					  type
+	-------------------------------------------*/
+
+	/// SingleType ::= bool | int | real | char | string | unit
+	TypeAST* ParseSingleType();
+
+	/// ParenType ::= '(' Type ')'
+	TypeAST* ParseParenType();
+
+	/// PrimaryType ::= SingleType
+	///				::= ParenType
+	TypeAST* ParsePrimaryType();
+
+	/// Type ::= PrimaryType ('*' Type)*
+	TypeAST* ParseType();
+
+	void HandleDeclaration();
+	void HandleTopLevelExpression();
+
+
+public:
+
+	Lexer lexer;
+	void MainLoop();
+	void resetLastChar() { lexer.resetLastChar(); }
+	int getNextToken() { return CurTok = lexer.gettok(); }
+	void InitializeModuleAndPassManager();
+	Parser() {
+		this->BinopPrecedence = {
+	   {tok_andalso,10}, {tok_orelse,10}, {'<',20}, {'>',20}, {'<>',20}, {'<=',20},
+	   {'>=',20}, {'=', 20}, {'+',30}, {'-',30}, {'^',30}, {'*',40}, {tok_div,40}, {'/',40}
+		};
+		this->CurTok = 0;
+	}
 };
 
+#endif // !PARSER_H

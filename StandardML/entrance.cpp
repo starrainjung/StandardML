@@ -2,19 +2,28 @@
 	the entrcance of the program StandardML
 	the main fucntion lays below
 ---------------------------------------------------*/
-#include "Lexer.h"
-
-
-
-
+#include "Utility.h"
+#include "Parser.h"
 
 int main() {
 
-	Lexer lexer;
-	while (true) {
+	InitializeNativeTarget();
+	InitializeNativeTargetAsmPrinter();
+	InitializeNativeTargetAsmParser();
 
-		fprintf(stdout, "%d ",lexer.gettok());
-		
-	}
+	Parser MainParser;
+
+	// Prime the first token.
+	fprintf(stderr, " - ");
+	MainParser.getNextToken();
+
+	TheJIT = llvm::make_unique<SMLJIT>();
+
+	MainParser.InitializeModuleAndPassManager();
+
+	// Run the main "interpreter loop" now.
+	MainParser.MainLoop();
+
+	return 0;
 }
 
